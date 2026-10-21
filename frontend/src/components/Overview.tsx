@@ -1,8 +1,18 @@
 import { useEffect, useState } from 'react'
-import { api, formatDeviation, formatTime, type Greenhouse } from '../api'
+import { api, formatDeviation, type Greenhouse } from '../api'
 import { navigate } from '../App'
+import { Arrow } from './Icons'
 import MapView from './MapView'
-import { StatusDot, StatusPill } from './Status'
+import { StatusPill } from './Status'
+
+function headline(greenhouses: Greenhouse[] | null) {
+  if (greenhouses === null) return 'Checking roof stations…'
+  if (greenhouses.length === 0) return 'Add a greenhouse to check its roof station.'
+  const flagged = greenhouses.filter((g) => g.status === 'alert' || g.status === 'warning').length
+  if (flagged === 0) return 'Every roof station matches Meteocat.'
+  if (flagged === greenhouses.length) return 'Every roof station needs a look.'
+  return `${flagged} of ${greenhouses.length} roof stations need a look.`
+}
 
 export default function Overview() {
   const [greenhouses, setGreenhouses] = useState<Greenhouse[] | null>(null)
@@ -19,59 +29,51 @@ export default function Overview() {
     return () => { active = false; clearInterval(timer) }
   }, [])
 
-  const needsAttention = greenhouses?.filter((g) => g.status === 'alert' || g.status === 'warning').length ?? 0
-
   return (
     <>
-      <section className="intro">
+      <section className="hero">
         <div>
-          <h1>Your greenhouses</h1>
-          <p className="muted">
-            Each roof weather station is compared with the nearest official Meteocat station. When the usual
-            difference between them shifts, the sensor is probably dirty, drifting or stuck.
+          <p className="eyebrow">Roof station health · Catalunya</p>
+          <h1 className="display">{headline(greenhouses)}</h1>
+          <p className="lede">
+            Each greenhouse's roof weather station is compared with the nearest official Meteocat station. When the
+            usual difference between them shifts, the sensor is probably dirty, drifting or stuck.
           </p>
         </div>
-        <button className="btn btn-primary" onClick={() => navigate('/new')}>Add greenhouse</button>
+        <button className="btn btn-primary" onClick={() => navigate('/new')}>
+          Add greenhouse <span className="btn-arrow"><Arrow /></span>
+        </button>
       </section>
 
       {error && <div className="banner banner-error">Couldn't load greenhouses: {error}</div>}
 
-      {greenhouses && (
-        <p className="summary-line">
-          {needsAttention === 0
-            ? 'All roof stations look healthy.'
-            : `${needsAttention} of ${greenhouses.length} roof stations need a look.`}
-        </p>
-      )}
-
       <div className="overview-grid">
-        <div className="gh-list">
-          {greenhouses === null && !error && <div className="card muted">Loading…</div>}
-          {greenhouses?.length === 0 && (
-            <div className="card muted">No greenhouses yet. Add one to start checking its station.</div>
-          )}
+        <ol className="rows">
+          {greenhouses?.length === 0 && <li className="row-empty">No greenhouses yet.</li>}
           {greenhouses?.map((g) => (
-            <button key={g.id} className="card gh-card" onClick={() => navigate(`/greenhouse/${g.id}`)}>
-              <div className="gh-card-head">
-                <strong>{g.name}</strong>
+            <li key={g.id}>
+              <button className="row" onClick={() => navigate(`/greenhouse/${g.id}`)}>
+                <span>
+                  <span className="row-name">{g.name}</span>
+                  <span className="row-meta">vs Meteocat {g.station.name} · {g.station.km} km</span>
+                </span>
                 <StatusPill status={g.status} />
-              </div>
-              <div className="muted small">
-                vs Meteocat {g.station.name} · {g.station.km} km · synced {formatTime(g.source.lastSyncAt)}
-              </div>
-              <div className="gh-vars">
-                {g.variables.map((v) => (
-                  <span key={v.variable} className="gh-var">
-                    <StatusDot status={v.status} />
-                    {v.label} <span className="muted">{formatDeviation(v)}</span>
-                  </span>
-                ))}
-              </div>
-            </button>
+                <dl className="row-figs">
+                  {g.variables.map((v) => (
+                    <div key={v.variable}>
+                      <dt>{v.label}</dt>
+                      <dd className={`dev-${v.status}`}>{formatDeviation(v)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </button>
+            </li>
           ))}
-        </div>
-        <div className="card map-card">
-          <MapView greenhouses={greenhouses ?? []} onSelect={(id) => navigate(`/greenhouse/${id}`)} height={480} fit />
+        </ol>
+        <div className="map-frame">
+          <div className="map-wrap">
+            <MapView greenhouses={greenhouses ?? []} onSelect={(id) => navigate(`/greenhouse/${id}`)} height={460} fit />
+          </div>
         </div>
       </div>
     </>

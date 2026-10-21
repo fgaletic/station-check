@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, type Company, type Greenhouse, type NearestStation, type Scenario } from '../api'
 import { navigate } from '../App'
+import { Arrow } from './Icons'
 import MapView from './MapView'
 
 export default function AddGreenhouse() {
@@ -50,50 +51,54 @@ export default function AddGreenhouse() {
   return (
     <>
       <a className="back" href="#/">← All greenhouses</a>
-      <h1>Add a greenhouse</h1>
-      <p className="muted">Click the map where the greenhouse is. We'll pick the nearest Meteocat station as its reference.</p>
+      <section className="detail-hero">
+        <p className="eyebrow">New greenhouse</p>
+        <h1 className="display display-sm">Where is the greenhouse?</h1>
+        <p className="lede">
+          Click its location on the map. The nearest Meteocat station that measures temperature, humidity and sunlight
+          becomes its reference.
+        </p>
+      </section>
 
       <div className="add-grid">
-        <div className="card map-card">
-          <MapView greenhouses={existing} onPick={(lat, lon) => setPicked({ lat, lon })} picked={picked} height={460} />
+        <div className="map-wrap">
+          <MapView greenhouses={existing} onPick={(lat, lon) => setPicked({ lat, lon })} picked={picked} height={480} />
         </div>
 
-        <form className="card form" onSubmit={submit}>
-          <label>
-            Location
-            <span className="field-static">
-              {picked ? `${picked.lat.toFixed(4)}, ${picked.lon.toFixed(4)}` : 'Click the map'}
+        <form className="form" onSubmit={submit}>
+          <div className="field">
+            <span className="field-label">Reference station</span>
+            <span className={`field-static ${station ? '' : 'empty'}`}>
+              {!picked ? 'Click the map first' : station ? `${station.name}, ${station.km} km` : 'Finding the nearest…'}
             </span>
+            {station && <span className="muted tiny">{station.comarca} · {picked!.lat.toFixed(3)}, {picked!.lon.toFixed(3)}</span>}
+          </div>
+          <label className="field">
+            <span className="field-label">Name</span>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Cabrils tomatoes" required maxLength={80} />
           </label>
-          <label>
-            Reference station
-            <span className="field-static">
-              {!picked ? '–' : station ? `${station.name} (${station.comarca}) · ${station.km} km` : 'Finding nearest…'}
-            </span>
-          </label>
-          <label>
-            Name
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Cabrils tomatoes" required maxLength={80} />
-          </label>
-          <label>
-            Grower company in Source
+          <label className="field">
+            <span className="field-label">Grower company in Source</span>
             <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} required>
               {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </label>
-          <label>
-            Roof station data <span className="demo-tag">Demo</span>
+          <label className="field">
+            <span className="field-label">Roof station data <span className="demo-tag">Demo</span></span>
             <select value={scenario} onChange={(e) => setScenario(e.target.value)}>
               {scenarios.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
             </select>
             <span className="muted tiny">
-              Real roof-station data would come from the climate computer. Here it's simulated, optionally with a fault.
+              In production this comes from the climate computer. Here it's simulated, optionally with a fault.
             </span>
           </label>
           {error && <div className="banner banner-error">{error}</div>}
-          <button className="btn btn-primary" disabled={!picked || !station || !companyId || busy}>
-            {busy ? 'Loading 14 days of data…' : 'Add greenhouse'}
-          </button>
+          <div>
+            <button className="btn btn-primary" disabled={!picked || !station || !companyId || busy}>
+              {busy ? 'Loading 14 days of readings…' : 'Add greenhouse'}
+              <span className="btn-arrow"><Arrow /></span>
+            </button>
+          </div>
         </form>
       </div>
     </>

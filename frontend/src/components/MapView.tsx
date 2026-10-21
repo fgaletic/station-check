@@ -1,9 +1,27 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CircleMarker, MapContainer, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import type { Greenhouse } from '../api'
 
-const STATUS_COLOR = { ok: '#2f9e5b', warning: '#d99a1e', alert: '#d64545', unknown: '#8a938f' }
+const STATUS_COLOR = {
+  light: { ok: '#3f7d4e', warning: '#b7791f', alert: '#b4432f', unknown: '#80867f', ring: '#f6f9f3', pick: '#c4622d' },
+  dark: { ok: '#7fbf8c', warning: '#e0a54a', alert: '#e5745d', unknown: '#889187', ring: '#0f1411', pick: '#e07a43' },
+}
+// Standard OSM tiles, muted with a CSS filter per theme (see .map-light / .map-dark in index.css).
+const TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 const CATALONIA: [number, number] = [41.65, 1.65]
+
+function useColorScheme(): 'light' | 'dark' {
+  const query = '(prefers-color-scheme: dark)'
+  const [dark, setDark] = useState(() => window.matchMedia(query).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(query)
+    const onChange = () => setDark(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  return dark ? 'dark' : 'light'
+}
 
 function ClickToPick({ onPick }: { onPick: (lat: number, lon: number) => void }) {
   useMapEvents({ click: (e) => onPick(e.latlng.lat, e.latlng.lng) })
@@ -47,25 +65,22 @@ interface Props {
   onPick?: (lat: number, lon: number) => void
   picked?: { lat: number; lon: number } | null
   height?: number
-  center?: [number, number]
-  zoom?: number
   fit?: boolean
 }
 
-export default function MapView({ greenhouses, onSelect, onPick, picked, height = 420, center, zoom, fit }: Props) {
+export default function MapView({ greenhouses, onSelect, onPick, picked, height = 420, fit }: Props) {
+  const scheme = useColorScheme()
+  const colors = STATUS_COLOR[scheme]
   return (
-    <div className={`map ${onPick ? 'map-picking' : ''}`} style={{ height }}>
-      <MapContainer center={center ?? CATALONIA} zoom={zoom ?? 8} scrollWheelZoom style={{ height: '100%' }}>
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+    <div className={`map map-${scheme} ${onPick ? 'map-picking' : ''}`} style={{ height }}>
+      <MapContainer center={CATALONIA} zoom={8} scrollWheelZoom style={{ height: '100%' }}>
+        <TileLayer attribution={ATTRIBUTION} url={TILES} />
         {greenhouses.map((g) => (
           <CircleMarker
             key={g.id}
             center={[g.lat, g.lon]}
-            radius={9}
-            pathOptions={{ color: '#fff', weight: 2, fillColor: STATUS_COLOR[g.status], fillOpacity: 1 }}
+            radius={g.status === 'alert' ? 9 : 7}
+            pathOptions={{ color: colors.ring, weight: 3, fillColor: colors[g.status], fillOpacity: 1 }}
             eventHandlers={onSelect ? { click: () => onSelect(g.id) } : undefined}
           >
             <Tooltip direction="top" offset={[0, -8]}>{g.name}</Tooltip>
@@ -73,7 +88,7 @@ export default function MapView({ greenhouses, onSelect, onPick, picked, height 
         ))}
         {picked && (
           <CircleMarker center={[picked.lat, picked.lon]} radius={10}
-            pathOptions={{ color: '#1d6fd6', weight: 3, fillColor: '#1d6fd6', fillOpacity: 0.35 }} />
+            pathOptions={{ color: colors.pick, weight: 2, fillColor: colors.pick, fillOpacity: 0.25 }} />
         )}
         {onPick && <ClickToPick onPick={onPick} />}
         <KeepSized />

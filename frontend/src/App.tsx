@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import AddGreenhouse from './components/AddGreenhouse'
 import GreenhouseDetail from './components/GreenhouseDetail'
+import { GaugeMark } from './components/Icons'
 import Overview from './components/Overview'
 
 type Route = { page: 'overview' } | { page: 'new' } | { page: 'greenhouse'; id: number }
@@ -32,10 +33,10 @@ export default function App() {
     <>
       <header className="topbar">
         <a className="brand" href="#/">
-          <span className="brand-mark" aria-hidden>◎</span>
+          <GaugeMark />
           Station Check
         </a>
-        <span className="tagline">Is your greenhouse weather station telling the truth?</span>
+        <span className="topbar-meta">Roof weather stations, checked against Meteocat</span>
       </header>
       <main className="page">
         {route.page === 'overview' && <Overview />}
@@ -43,8 +44,8 @@ export default function App() {
         {route.page === 'greenhouse' && <GreenhouseDetail key={route.id} id={route.id} />}
       </main>
       <footer className="footer">
-        Reference data: Meteocat XEMA via Generalitat de Catalunya open data · Sends results to Source via the
-        Source Sensor API v2
+        Reference data: Meteocat XEMA network, via Generalitat de Catalunya open data. Results are sent to Source
+        through the Source Sensor API v2.
       </footer>
     </>
   )

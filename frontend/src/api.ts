@@ -9,6 +9,7 @@ export interface VariableHealth {
   deviation: number | null
   message?: string
   thresholds?: { warning: number; alert: number }
+  stuck?: boolean
   daily?: { day: string; deviation: number }[]
 }
 
@@ -79,7 +80,8 @@ export function formatTime(ts: string | null): string {
 
 export function formatDeviation(v: VariableHealth): string {
   if (v.deviation === null) return '–'
-  const sign = v.deviation > 0 ? '+' : ''
   const digits = v.unit === '%' ? 0 : 1
-  return `${sign}${v.deviation.toFixed(digits)} ${v.unit}`
+  const shown = Number(v.deviation.toFixed(digits))
+  const sign = shown > 0 ? '+' : shown < 0 ? '−' : ''
+  return `${sign}${Math.abs(shown).toFixed(digits)} ${v.unit}`
 }

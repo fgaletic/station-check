@@ -1,14 +1,14 @@
 import type { Status } from '../api'
 
 const LABELS: Record<Status, string> = {
-  ok: 'Healthy',
-  warning: 'Check soon',
-  alert: 'Needs attention',
-  unknown: 'Not enough data',
+  ok: 'healthy',
+  warning: 'check soon',
+  alert: 'needs attention',
+  unknown: 'not enough data',
 }
 
 export function StatusPill({ status }: { status: Status }) {
-  return <span className={`pill pill-${status}`}>{LABELS[status]}</span>
+  return <span className="status"><StatusDot status={status} />{LABELS[status]}</span>
 }
 
 export function StatusDot({ status, title }: { status: Status; title?: string }) {

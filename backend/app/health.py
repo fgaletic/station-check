@@ -94,7 +94,7 @@ def _stuck(variable, pairs):
 def check_variable(conn, gh, variable):
     spec = VARIABLES[variable]
     result = {"variable": variable, "label": spec["label"], "unit": spec["unit"], "status": "unknown",
-              "thresholds": {"warning": spec["warn"], "alert": spec["alert"]},
+              "thresholds": {"warning": spec["warn"], "alert": spec["alert"]}, "stuck": False,
               "deviation": None, "message": "Not enough data from Meteocat yet.", "daily": []}
     pairs = db.paired_series(conn, gh["id"], variable, since=gh["baseline_start"])
     if not pairs:
@@ -115,7 +115,7 @@ def check_variable(conn, gh, variable):
 
     stuck_range = _stuck(variable, pairs)
     if stuck_range is not None:
-        result.update(status="alert", deviation=_round(deviation),
+        result.update(status="alert", stuck=True, deviation=_round(deviation),
                       message=ADVICE[(variable, "stuck")].format(ref_range=stuck_range))
         return result
 
