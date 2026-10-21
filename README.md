@@ -114,7 +114,9 @@ docker build -t station-check .
 docker run -p 8000:8000 station-check
 ```
 
-**Render (free):** New → Blueprint → select this repo. [render.yaml](render.yaml) does
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/fgaletic/station-check)
+
+**Render (free):** click the button above, or New → Blueprint → select this repo. [render.yaml](render.yaml) does
 the rest. On the free plan the service sleeps after 15 minutes without traffic, so the
 first visit takes about a minute. The SQLite data resets on each restart, and the demo
 greenhouses are recreated automatically.
