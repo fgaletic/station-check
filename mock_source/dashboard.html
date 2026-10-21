@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Source Mock Inbox</title>
+<style>
+  :root { --bg:#f6f5f1; --card:#fff; --ink:#1d2321; --muted:#66706b; --line:#e2e0d8; --accent:#2f7d4f; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#141816; --card:#1d2321; --ink:#e9ece9; --muted:#9aa49f; --line:#2c3430; --accent:#6cc28f; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui, sans-serif; }
+  main { max-width:1000px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { font-size:22px; margin:0; }
+  .sub { color:var(--muted); margin:2px 0 20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:500; }
+  tr.sel td { background:color-mix(in srgb, var(--accent) 12%, transparent); }
+  tbody tr { cursor:pointer; }
+  .stats { display:flex; gap:24px; flex-wrap:wrap; }
+  .stat b { display:block; font-size:24px; }
+  .stat span { color:var(--muted); font-size:13px; }
+  .charts { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; }
+  .chart h3 { font-size:14px; margin:0 0 4px; }
+  .chart .now { color:var(--muted); font-size:13px; }
+  svg { width:100%; height:120px; display:block; }
+  code { font-size:13px; }
+  .wrap { overflow-x:auto; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Source mock: received data</h1>
+  <p class="sub">Dades rebudes pel mock de l'API de Source · refreshes every 10 s</p>
+
+  <div class="card stats">
+    <div class="stat"><b id="nSensors">–</b><span>sensors</span></div>
+    <div class="stat"><b id="nMeas">–</b><span>measurements accepted</span></div>
+    <div class="stat"><b id="last">–</b><span>latest reading (UTC)</span></div>
+  </div>
+
+  <div class="card wrap">
+    <table>
+      <thead><tr><th>Name</th><th>Serial</th><th>Sensor ID</th></tr></thead>
+      <tbody id="sensors"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="charts" id="charts"><p class="sub">Run the bridge to see data here.</p></div>
+  </div>
+</main>
+<script>
+let selected = null, data = null;
+
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function spark(points) {
+  const w = 300, h = 120, p = 6;
+  const xs = points.map(d => d.t), ys = points.map(d => d.v);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const sx = t => p + (x1 === x0 ? 0.5 : (t - x0) / (x1 - x0)) * (w - 2 * p);
+  const sy = v => h - p - (y1 === y0 ? 0.5 : (v - y0) / (y1 - y0)) * (h - 2 * p);
+  const d = points.map((pt, i) => (i ? 'L' : 'M') + sx(pt.t).toFixed(1) + ' ' + sy(pt.v).toFixed(1)).join(' ');
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img">
+    <path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>
+    <div class="now">min ${y0} · max ${y1}</div>`;
+}
+
+function render() {
+  const sensors = data.sensors;
+  document.getElementById('nSensors').textContent = sensors.length;
+  document.getElementById('nMeas').textContent = data.measurementCount.toLocaleString();
+  const lastTs = data.latest.reduce((a, m) => m.timestamp > a ? m.timestamp : a, '');
+  document.getElementById('last').textContent = lastTs ? lastTs.replace('T', ' ').slice(0, 16) : '–';
+  if (!selected && sensors.length) selected = sensors[0].id;
+
+  document.getElementById('sensors').innerHTML = sensors.map(s =>
+    `<tr data-id="${esc(s.id)}" class="${s.id === selected ? 'sel' : ''}">
+      <td>${esc(s.name)}</td><td><code>${esc(s.serial)}</code></td><td><code>${esc(s.id.slice(0, 8))}…</code></td></tr>`).join('');
+
+  const byType = {};
+  for (const m of data.latest) {
+    if (m.sensorId !== selected) continue;
+    (byType[m.measurementType] ||= []).push({ t: Date.parse(m.timestamp), v: m.value });
+  }
+  const html = Object.entries(byType).map(([type, pts]) => {
+    pts.sort((a, b) => a.t - b.t);
+    return `<div class="chart"><h3>${esc(type)} <span class="now">· now ${pts[pts.length - 1].v}</span></h3>${spark(pts)}</div>`;
+  }).join('');
+  if (html) document.getElementById('charts').innerHTML = html;
+}
+
+document.getElementById('sensors').addEventListener('click', e => {
+  const row = e.target.closest('tr'); if (!row) return;
+  selected = row.dataset.id; render();
+});
+
+async function load() {
+  try { data = await (await fetch('/debug/state')).json(); render(); } catch (e) { console.error(e); }
+}
+load(); setInterval(load, 10000);
+</script>
+</body>
+</html>

@@ -1,0 +1,521 @@
+openapi: 3.0.3
+info:
+  title: Source.ag Sensor API
+  description: |
+    Manage sensors and submit greenhouse sensor measurements to the Source.ag backend.
+
+    This API uses the [OAuth2 Client Credentials](https://datatracker.ietf.org/doc/html/rfc6749#section-4.4) flow for
+    authentication.
+
+    To obtain an access token, a request of the following form has to be performed, where `auth-server` is the
+    environment-specific authentication server address (please refer to the `securitySchemes` section of the specification):
+    ```
+    POST /oauth2/token HTTP/1.1
+    Host: <auth-server>
+
+    grant_type=client_credentials
+    &client_id=<source-client-id>
+    &client_secret=<source-client-secret>
+    ```
+
+    The issued token is valid for a limited period of time, equal to the returned `expires_in` value (in seconds),
+    after which a new access token needs to be requested.
+
+    The access token can then be used to authenticate API request in the following manner, where `api-server` is the
+    environment-specific API server address (please refer to the `servers` section of the specification):
+    ```
+    GET /companies HTTP/1.1
+    Host: <api-server>
+
+    Authorization: Bearer <access-token>
+    ```
+
+  contact:
+    email: apis@source.ag
+  version: 2.8.0
+
+
+servers:
+  - url: https://sensors.dev.sourceapis.com/v2
+    description: Development server
+  - url: https://sensors.sourceapis.com/v2
+    description: Production server
+
+
+tags:
+  - name: Companies
+    description: Operations relating to grower companies
+  - name: Measurement Types
+    description: Operations relating to measurement types
+  - name: Sensors
+    description: Operations relating to sensor management
+  - name: Measurements
+    description: Operations relating to measurements
+
+
+security:
+  - OAuthDev: []
+  - OAuth: []
+
+
+paths:
+  /companies:
+    get:
+      tags:
+        - Companies
+      summary: List companies
+      description: Get the list of authorized companies
+      responses:
+        200:
+          $ref: '#/components/responses/CompanyListResponse'
+        401:
+          $ref: '#/components/responses/AuthenticationFailed'
+        429:
+          $ref: '#/components/responses/TooManyRequests'
+
+  /measurement-types:
+    get:
+      tags:
+        - Measurement Types
+      summary: List measurement types
+      description: Get the list of supported measurement types for which measurements can be submitted
+      responses:
+        200:
+          $ref: '#/components/responses/MeasurementTypeListResponse'
+        401:
+          $ref: '#/components/responses/AuthenticationFailed'
+        429:
+          $ref: '#/components/responses/TooManyRequests'
+
+  /sensors:
+    post:
+      tags:
+        - Sensors
+      summary: Create sensor
+      description: Create a sensor linked to a company in the Source.ag backend
+      requestBody:
+        $ref: '#/components/requestBodies/CreateSensorRequestBody'
+      responses:
+        201:
+          $ref: '#/components/responses/SensorCreatedResponse'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        401:
+          $ref: '#/components/responses/AuthenticationFailed'
+        403:
+          $ref: '#/components/responses/AuthorizationFailed'
+        409:
+          $ref: '#/components/responses/ResourceAlreadyExists'
+        429:
+          $ref: '#/components/responses/TooManyRequests'
+
+    get:
+      tags:
+        - Sensors
+      summary: List sensors
+      description: Get the list of your sensors
+      responses:
+        200:
+          $ref: '#/components/responses/SensorListResponse'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        401:
+          $ref: '#/components/responses/AuthenticationFailed'
+        403:
+          $ref: '#/components/responses/AuthorizationFailed'
+        429:
+          $ref: '#/components/responses/TooManyRequests'
+
+  /sensors/{id}:
+    get:
+      tags:
+        - Sensors
+      summary: Get sensor
+      description: Get a sensor by its UUID
+      parameters:
+        - name: id
+          in: path
+          description: Sensor ID
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          $ref: '#/components/responses/SensorResponse'
+        401:
+          $ref: '#/components/responses/AuthenticationFailed'
+        403:
+          $ref: '#/components/responses/AuthorizationFailed'
+        404:
+          $ref: '#/components/responses/ResourceNotFound'
+        429:
+          $ref: '#/components/responses/TooManyRequests'
+
+    patch:
+      tags:
+        - Sensors
+      summary: Update sensor
+      description: Update specific properties of a sensor that has been created in the Source.ag backend
+      parameters:
+        - name: id
+          in: path
+          description: Unique identifier of the sensor in the Source.ag backend
+          required: true
+          schema:
+            type: string
+            format: uuid
+            example: 'eb000702-43c6-48e1-b4f4-3391b5799949'
+      requestBody:
+        $ref: '#/components/requestBodies/UpdateSensorRequestBody'
+      responses:
+        204:
+          description: Sensor updated
+        400:
+          $ref: '#/components/responses/BadRequest'
+        401:
+          $ref: '#/components/responses/AuthenticationFailed'
+        403:
+          $ref: '#/components/responses/AuthorizationFailed'
+        404:
+          $ref: '#/components/responses/ResourceNotFound'
+        429:
+          $ref: '#/components/responses/TooManyRequests'
+
+  /measurements:
+    post:
+      tags:
+        - Measurements
+      summary: Submit measurements
+      description: |
+        Bulk upload measurements. A successful response indicates that a batch of measurements has successfully been received
+        and will be processed in due course.
+      requestBody:
+        $ref: '#/components/requestBodies/MeasurementsRequestBody'
+      responses:
+        202:
+          description: Successful operation
+        400:
+          $ref: '#/components/responses/BadRequest'
+        401:
+          $ref: '#/components/responses/AuthenticationFailed'
+        403:
+          $ref: '#/components/responses/AuthorizationFailed'
+        422:
+          $ref: '#/components/responses/UnprocessableEntity'
+        429:
+          $ref: '#/components/responses/TooManyRequests'
+
+
+components:
+  schemas:
+    Company:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier of the company in Source.ag backend
+          example: 'eb000702-43c6-48e1-b4f4-3391b5799949'
+        name:
+          type: string
+          description: Name of the company
+          example: Tomato Inc.
+      required:
+        - id
+        - name
+    CompanyList:
+      type: object
+      required:
+        - companies
+      properties:
+        companies:
+          type: array
+          items:
+            $ref: '#/components/schemas/Company'
+
+    MeasurementType:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of measurement type
+          example: 'substrate_weight'
+        unitOfMeasurement:
+          type: string
+          description: Unit of measure for the measurement type
+          example: g
+      required:
+        - name
+        - unitOfMeasurement
+    MeasurementTypeList:
+      type: object
+      properties:
+        measurementTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/MeasurementType'
+      required:
+        - measurementTypes
+
+    Measurement:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Date-time with timezone in ISO 8601 format
+          example: '2023-02-06T12:00:21Z'
+        measurementType:
+          type: string
+          description: Name of the measurement type
+          example: 'substrate_weight'
+        sensorId:
+          type: string
+          format: uuid
+          description: Unique identifier of the sensor in Source.ag backend
+          example: ccd783bb-876c-487b-86bd-f70d0c890399
+        value:
+          type: number
+          description: Measurement value
+          example: 1.23
+      required:
+        - timestamp
+        - measurementType
+        - sensorId
+        - value
+    MeasurementList:
+      type: object
+      properties:
+        measurements:
+          type: array
+          items:
+            $ref: '#/components/schemas/Measurement'
+      required:
+        - measurements
+
+
+    Sensor:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier of the sensor in the Source.ag backend
+          example: ccd783bb-876c-487b-86bd-f70d0c890399
+        serial:
+          type: string
+          description: Unique identifier of the sensor in the integration partner's backend
+          example: '3c9b9387-748f-4c5d-9c5d-420556d60fcb'
+        name:
+          type: string
+          description: Sensor name
+          example: 'Drain 0001'
+        companyId:
+          type: string
+          format: uuid
+          description: Unique identifier of the company in the Source.ag backend
+          example: 'eb000702-43c6-48e1-b4f4-3391b5799949'
+      required:
+        - id
+        - serial
+        - companyId
+        - name
+    SensorList:
+      type: object
+      properties:
+        sensors:
+          type: array
+          items:
+            $ref: '#/components/schemas/Sensor'
+    CreatedSensorInfo:
+      type: object
+      properties:
+        sensorId:
+          type: string
+          format: uuid
+          description: Unique identifier of the sensor in the Source.ag backend
+          example: ccd783bb-876c-487b-86bd-f70d0c890399
+      required:
+        - sensorId
+
+    CreateSensorInfo:
+      type: object
+      properties:
+        serial:
+          type: string
+          description: Unique identifier of the sensor in the integration partner's backend
+          example: '3c9b9387-748f-4c5d-9c5d-420556d60fcb'
+        companyId:
+          type: string
+          format: uuid
+          description: Unique identifier of the company in the Source.ag backend
+          example: 'eb000702-43c6-48e1-b4f4-3391b5799949'
+        name:
+          type: string
+          description: Sensor name
+          example: 'Drain 0001'
+      required:
+        - serial
+        - companyId
+        - name
+
+    UpdateSensorInfo:
+      type: object
+      properties:
+        name:
+          type: string
+          description: New sensor name
+          example: 'Drain 0002'
+      required:
+        - name
+
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+          description: The error message
+      required:
+        - message
+    ValidationError:
+      type: object
+      properties:
+        message:
+          type: string
+          description: The error message
+        validationErrors:
+          type: array
+          description: The list of all failed validation rules (if any)
+          items:
+            type: string
+
+
+  responses:
+    CompanyListResponse:
+      description: A list of companies
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CompanyList'
+
+    SensorResponse:
+      description: A sensor
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Sensor'
+
+    SensorCreatedResponse:
+      description: Newly created sensor information
+      headers:
+        Location:
+          schema:
+            type: string
+          description: Location of the newly created sensor
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CreatedSensorInfo'
+
+    SensorListResponse:
+      description: A list of sensors
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SensorList'
+
+    MeasurementTypeListResponse:
+      description: A list of measurement types
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MeasurementTypeList'
+
+    BadRequest:
+      description: Request body was malformed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+          example:
+            message: 'Bad request'
+
+    UnprocessableEntity:
+      description: Request body is valid but the server is not able to process the request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: 'Could not process request body'
+
+    ResourceNotFound:
+      description: Resource does not exist
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: 'Sensor not found'
+
+    ResourceAlreadyExists:
+      description: Resource already exists
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: 'Sensor already exists'
+
+    AuthenticationFailed:
+      description: Authentication failed
+
+    AuthorizationFailed:
+      description: Not authorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            message: 'Permission denied'
+
+    TooManyRequests:
+      description: Too many requests
+
+  requestBodies:
+    CreateSensorRequestBody:
+      description: Create sensor request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CreateSensorInfo'
+
+    UpdateSensorRequestBody:
+      description: Update sensor request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UpdateSensorInfo'
+
+    MeasurementsRequestBody:
+      description: A batch of measurements
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MeasurementList'
+      required: true
+
+  securitySchemes:
+    OAuthDev:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://auth.dev.sourceapis.com/oauth2/token
+          scopes: {}
+    OAuth:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://auth.sourceapis.com/oauth2/token
+          scopes: {}

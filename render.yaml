@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: station-check
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/scenarios

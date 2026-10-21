@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+node_modules/
+frontend/dist/
+*.db
+*.db-shm
+*.db-wal
+mock_source/mock_state.json
+.claude/
