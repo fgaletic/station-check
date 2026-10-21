@@ -60,7 +60,9 @@ export const api = {
   create: (body: { name: string; lat: number; lon: number; companyId: string; scenario: string }) =>
     request<Greenhouse>('/greenhouses', { method: 'POST', body: JSON.stringify(body) }),
   sync: (id: number) =>
-    request<{ newReadings: number; sentToSource: number; error: string | null; greenhouse: Greenhouse }>(
+    request<{
+      newReadings: number; sentToSource: number; skippedTypes: string[]; error: string | null; greenhouse: Greenhouse
+    }>(
       `/greenhouses/${id}/sync`, { method: 'POST' }),
   remove: (id: number) => request<void>(`/greenhouses/${id}`, { method: 'DELETE' }),
   nearestStation: (lat: number, lon: number) => request<NearestStation>(`/stations/nearest?lat=${lat}&lon=${lon}`),

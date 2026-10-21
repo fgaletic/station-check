@@ -141,7 +141,10 @@ export default function GreenhouseDetail({ id }: { id: number }) {
     try {
       const r = await api.sync(id)
       setGh(r.greenhouse)
-      setSyncNote(r.error ?? `${r.newReadings} new readings from Meteocat · ${r.sentToSource} measurements sent to Source`)
+      const skipped = r.skippedTypes.length
+        ? ` · not sent, Source doesn't accept: ${r.skippedTypes.join(', ')}` : ''
+      setSyncNote(r.error ??
+        `${r.newReadings} new readings from Meteocat · ${r.sentToSource} measurements sent to Source${skipped}`)
     } catch (e) {
       setSyncNote((e as Error).message)
     } finally {

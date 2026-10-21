@@ -45,6 +45,7 @@ class AppTest(unittest.TestCase):
         db.DB_PATH = Path(self.tmp.name) / "test.db"
         db.init()
         sync._stations_cache.update(at=0.0, stations=[])
+        sync._types_cache.update(at=0.0, names=set())
 
         server.STATE_FILE = Path(self.tmp.name) / "mock_state.json"
         server.state.update({"sensors": {}, "measurements": []})
@@ -106,6 +107,17 @@ class AppTest(unittest.TestCase):
             result = sync.sync_greenhouse(conn, sync.get_greenhouse(conn, gh["id"]), self.client)
         self.assertEqual((result["newReadings"], result["sentToSource"], result["error"]), (0, 0, None))
         self.assertEqual(len(server.state["measurements"]), sent)
+
+    def test_types_source_does_not_accept_are_skipped_not_fatal(self):
+        known = [t for t in server.MEASUREMENT_TYPES if not t["name"].startswith("weather_station_")]
+        with mock.patch.object(server, "MEASUREMENT_TYPES", known), \
+                mock.patch.object(server, "TYPE_NAMES", {t["name"] for t in known}):
+            gh, _ = self.create("dusty_radiation")
+        self.assertIsNone(gh["last_sync_error"])
+        self.assertIsNotNone(gh["source_synced_until"])
+        types = {m["measurementType"] for m in server.state["measurements"]}
+        self.assertIn("outside_temperature", types)
+        self.assertFalse(any(t.startswith("weather_station_") for t in types))
 
     def test_source_outage_is_recorded_without_losing_data(self):
         self.httpd.shutdown()

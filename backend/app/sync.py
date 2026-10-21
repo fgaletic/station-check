@@ -8,10 +8,22 @@ from .source_client import SourceApiError
 BACKFILL_DAYS = 14
 BASELINE_DAYS = 7
 _stations_cache = {"at": 0.0, "stations": []}
+_types_cache = {"at": 0.0, "names": set()}
 
 
 def utc_now():
     return datetime.now(timezone.utc).replace(tzinfo=None, microsecond=0)
+
+
+def accepted_types(client):
+    """Measurement type names Source accepts (cached for an hour).
+
+    Our type names are guesses; Source rejects a batch containing an unknown type, so
+    anything not on Source's own list is dropped before sending.
+    """
+    if time.time() - _types_cache["at"] > 3600 or not _types_cache["names"]:
+        _types_cache.update(at=time.time(), names={t["name"] for t in client.measurement_types()})
+    return _types_cache["names"]
 
 
 def stations():
@@ -100,22 +112,29 @@ def _push_to_source(conn, gh, client, new_readings):
         batch += [{"timestamp": rows[-1]["ts"] + "Z", "measurementType": health.VARIABLES[v["variable"]]["health_type"],
                    "sensorId": health_sensor, "value": v["deviation"]}
                   for v in report["variables"] if v["deviation"] is not None]
+    accepted = accepted_types(client)
+    skipped = sorted({m["measurementType"] for m in batch} - accepted)
+    batch = [m for m in batch if m["measurementType"] in accepted]
     if batch:
         client.submit_measurements(batch)
+    if rows:  # advance even when everything was skipped, or we'd retry the same rows forever
         conn.execute("UPDATE greenhouses SET source_synced_until = ? WHERE id = ?", (rows[-1]["ts"], gh["id"]))
-    return len(batch)
+    return len(batch), skipped
 
 
 def sync_greenhouse(conn, gh, client):
     """Never raises: errors are recorded on the greenhouse so the UI can show them."""
-    result = {"newReadings": 0, "sentToSource": 0, "error": None}
+    result = {"newReadings": 0, "sentToSource": 0, "skippedTypes": [], "error": None}
     try:
         result["newReadings"] = _ingest(conn, gh)
     except Exception as e:
         result["error"] = f"Meteocat: {e}"
     if result["error"] is None:
         try:
-            result["sentToSource"] = _push_to_source(conn, get_greenhouse(conn, gh["id"]), client, result["newReadings"])
+            result["sentToSource"], result["skippedTypes"] = _push_to_source(
+                conn, get_greenhouse(conn, gh["id"]), client, result["newReadings"])
+            if result["skippedTypes"]:
+                print(f"[{gh['name']}] Source doesn't accept {', '.join(result['skippedTypes'])}; not sent")
         except (SourceApiError, OSError) as e:
             result["error"] = f"Source: {e}"
     conn.execute("UPDATE greenhouses SET last_sync_at = ?, last_sync_error = ? WHERE id = ?",
